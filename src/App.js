@@ -40,6 +40,7 @@ class App extends Component {
     state = {
         input1: '',
         input2: '',
+        input3: '',
         myTreeData: [{ name: nullNode, nodeSvgShape: blackColor }],
         forceMount: true,
         searchPath: ''
@@ -221,6 +222,135 @@ class App extends Component {
         }
     }
 
+    deleteNode = () => {
+        if (this.state.input3 !== '') {
+            let value = parseInt(this.state.input3, 10);
+            let tree = this.state.myTreeData;
+            let nodeToDelete = this.findNode(tree[0], value);
+            if (nodeToDelete.name === nullNode) {
+                alert('Value not found!');
+                return;
+            }
+            let successorOfNodeToDelete = nodeToDelete;
+            let successorOriginalColor = successorOfNodeToDelete.nodeSvgShape;
+            let x;
+            if (nodeToDelete.children[0].name === nullNode) {
+                x = nodeToDelete.children[1];
+                this.transplant(tree, nodeToDelete, nodeToDelete.children[1]);
+            } else if (nodeToDelete.children[1].name === nullNode) {
+                x = nodeToDelete.children[0];
+                this.transplant(tree, nodeToDelete, nodeToDelete.children[0]);
+            } else {
+                successorOfNodeToDelete = this.minimum(nodeToDelete.children[1]);
+                successorOriginalColor = successorOfNodeToDelete.nodeSvgShape;
+                x = successorOfNodeToDelete.children[1];
+                if (successorOfNodeToDelete.parent === nodeToDelete) {
+                    x.parent = successorOfNodeToDelete;
+                } else {
+                    this.transplant(tree, successorOfNodeToDelete, successorOfNodeToDelete.children[1]);
+                    successorOfNodeToDelete.children[1] = nodeToDelete.children[1];
+                    successorOfNodeToDelete.children[1].parent = successorOfNodeToDelete;
+                }
+                this.transplant(tree, nodeToDelete, successorOfNodeToDelete);
+                successorOfNodeToDelete.children[0] = nodeToDelete.children[0];
+                successorOfNodeToDelete.children[0].parent = successorOfNodeToDelete;
+                successorOfNodeToDelete.nodeSvgShape = nodeToDelete.nodeSvgShape;
+            }
+            if (successorOriginalColor === blackColor) {
+                this.deleteFixup(tree, x);
+            }
+            this.setState({
+                input3: '',
+                myTreeData: tree,
+                forceMount: !this.state.forceMount
+            });
+        }
+    }
+
+    findNode = (node, value) => {
+        if (node.name === nullNode || parseInt(node.name) === value) {
+            return node;
+        }
+        if (value < parseInt(node.name)) {
+            return this.findNode(node.children[0], value);
+        } else {
+            return this.findNode(node.children[1], value);
+        }
+    }
+
+    transplant = (tree, u, v) => {
+        if (u.parent === null) {
+            tree[0] = v;
+        } else if (u === u.parent.children[0]) {
+            u.parent.children[0] = v;
+        } else {
+            u.parent.children[1] = v;
+        }
+        v.parent = u.parent;
+    }
+
+    minimum = (node) => {
+        while (node.children[0].name !== nullNode) {
+            node = node.children[0];
+        }
+        return node;
+    }
+
+    deleteFixup = (tree, x) => {
+        while (x !== tree[0] && x.nodeSvgShape === blackColor) {
+            if (x === x.parent.children[0]) {
+                let sibling = x.parent.children[1];
+                if (sibling.nodeSvgShape === redColor) {
+                    sibling.nodeSvgShape = blackColor;
+                    x.parent.nodeSvgShape = redColor;
+                    this.leftRotate(tree, x.parent);
+                    sibling = x.parent.children[1];
+                }
+                if (sibling.children[0].nodeSvgShape === blackColor && sibling.children[1].nodeSvgShape === blackColor) {
+                    sibling.nodeSvgShape = redColor;
+                    x = x.parent;
+                } else {
+                    if (sibling.children[1].nodeSvgShape === blackColor) {
+                        sibling.children[0].nodeSvgShape = blackColor;
+                        sibling.nodeSvgShape = redColor;
+                        this.rightRotate(tree, sibling);
+                        sibling = x.parent.children[1];
+                    }
+                    sibling.nodeSvgShape = x.parent.nodeSvgShape;
+                    x.parent.nodeSvgShape = blackColor;
+                    sibling.children[1].nodeSvgShape = blackColor;
+                    this.leftRotate(tree, x.parent);
+                    x = tree[0];
+                }
+            } else {
+                let w = x.parent.children[0];
+                if (w.nodeSvgShape === redColor) {
+                    w.nodeSvgShape = blackColor;
+                    x.parent.nodeSvgShape = redColor;
+                    this.rightRotate(tree, x.parent);
+                    w = x.parent.children[0];
+                }
+                if (w.children[1].nodeSvgShape === blackColor && w.children[0].nodeSvgShape === blackColor) {
+                    w.nodeSvgShape = redColor;
+                    x = x.parent;
+                } else {
+                    if (w.children[0].nodeSvgShape === blackColor) {
+                        w.children[1].nodeSvgShape = blackColor;
+                        w.nodeSvgShape = redColor;
+                        this.leftRotate(tree, w);
+                        w = x.parent.children[0];
+                    }
+                    w.nodeSvgShape = x.parent.nodeSvgShape;
+                    x.parent.nodeSvgShape = blackColor;
+                    w.children[0].nodeSvgShape = blackColor;
+                    this.rightRotate(tree, x.parent);
+                    x = tree[0];
+                }
+            }
+        }
+        x.nodeSvgShape = blackColor;
+    }
+
     handleInputChange = name => event => {
         this.setState({
             [name]: event.target.value
@@ -239,6 +369,9 @@ class App extends Component {
 
                 <input style={{ marginLeft: 31 }} type="text" placeholder="Enter a value to search for" value={this.state.input2} onChange={this.handleInputChange('input2')} />
                 <button onClick={() => this.searchNode()}>Search</button>
+
+                <input style={{ marginLeft: 31 }} type="text" placeholder="Enter a value to delete" value={this.state.input3} onChange={this.handleInputChange('input3')} />
+                <button onClick={() => this.deleteNode()}>Delete</button>
                 <br />
                 {
                     this.state.searchPath !== '' &&
